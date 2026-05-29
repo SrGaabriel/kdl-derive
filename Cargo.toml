@@ -1,6 +1,9 @@
 [package]
+description = "Derive macros for KDL"
 edition = "2024"
+license = "Apache-2.0"
 name = "kdl-derive"
+repository = "https://github.com/SrGaabriel/kdl-derive"
 version = "0.1.0"
 
 [lib]
