@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::model::{Container, Field, FieldKind};
+use crate::model::{Container, DefaultSource, Field, FieldKind};
 
 pub fn expand_to_kdl(container: &Container) -> TokenStream {
     let ident = &container.ident;
@@ -232,6 +232,12 @@ fn field_from_expr(field: &Field) -> TokenStream {
     let inner_ty = &field.inner_ty;
     let optional = field.optional;
 
+    let default_value: Option<TokenStream> = match &field.default {
+        DefaultSource::None => None,
+        DefaultSource::Trait => Some(quote! { ::core::default::Default::default() }),
+        DefaultSource::Path(expr) => Some(quote! { (#expr)() }),
+    };
+
     match field.kind {
         FieldKind::Scalar => {
             let ok = if optional {
@@ -239,7 +245,9 @@ fn field_from_expr(field: &Field) -> TokenStream {
             } else {
                 quote! { ::core::option::Option::Some(__v) }
             };
-            let missing_node = if optional {
+            let missing_node = if let Some(__dv) = &default_value {
+                quote! { ::core::option::Option::Some(#__dv) }
+            } else if optional {
                 quote! { ::core::option::Option::Some(::core::option::Option::None) }
             } else {
                 quote! {
@@ -286,33 +294,25 @@ fn field_from_expr(field: &Field) -> TokenStream {
                     }
                 }
             };
-            if optional {
-                quote! {
-                    match __doc.get(#name) {
-                        ::core::option::Option::Some(__node) => {
-                            #collect
-                            if __ok {
-                                ::core::option::Option::Some(::core::option::Option::Some(__out))
-                            } else {
-                                ::core::option::Option::None
-                            }
-                        }
-                        ::core::option::Option::None => {
-                            ::core::option::Option::Some(::core::option::Option::None)
-                        }
-                    }
-                }
+            let absent = if let Some(__dv) = &default_value {
+                quote! { ::core::option::Option::Some(#__dv) }
+            } else if optional {
+                quote! { ::core::option::Option::Some(::core::option::Option::None) }
             } else {
-                quote! {
-                    match __doc.get(#name) {
-                        ::core::option::Option::Some(__node) => {
-                            #collect
-                            if __ok { ::core::option::Option::Some(__out) } else { ::core::option::Option::None }
-                        }
-                        ::core::option::Option::None => {
-                            ::core::option::Option::Some(::std::vec::Vec::new())
-                        }
+                quote! { ::core::option::Option::Some(::std::vec::Vec::new()) }
+            };
+            let present_ok = if optional {
+                quote! { ::core::option::Option::Some(::core::option::Option::Some(__out)) }
+            } else {
+                quote! { ::core::option::Option::Some(__out) }
+            };
+            quote! {
+                match __doc.get(#name) {
+                    ::core::option::Option::Some(__node) => {
+                        #collect
+                        if __ok { #present_ok } else { ::core::option::Option::None }
                     }
+                    ::core::option::Option::None => { #absent }
                 }
             }
         }
@@ -322,7 +322,9 @@ fn field_from_expr(field: &Field) -> TokenStream {
             } else {
                 quote! { ::core::option::Option::Some(__v) }
             };
-            let missing_node = if optional {
+            let missing_node = if let Some(__dv) = &default_value {
+                quote! { ::core::option::Option::Some(#__dv) }
+            } else if optional {
                 quote! { ::core::option::Option::Some(::core::option::Option::None) }
             } else {
                 quote! {
@@ -379,25 +381,27 @@ fn field_from_expr(field: &Field) -> TokenStream {
                     }
                 }
             };
-            if optional {
-                quote! {
-                    {
-                        #collect
-                        if !__ok {
-                            ::core::option::Option::None
-                        } else if __found {
-                            ::core::option::Option::Some(::core::option::Option::Some(__out))
-                        } else {
-                            ::core::option::Option::Some(::core::option::Option::None)
-                        }
-                    }
-                }
+            let absent = if let Some(__dv) = &default_value {
+                quote! { ::core::option::Option::Some(#__dv) }
+            } else if optional {
+                quote! { ::core::option::Option::Some(::core::option::Option::None) }
             } else {
-                quote! {
-                    {
-                        #collect
-                        let _ = __found;
-                        if __ok { ::core::option::Option::Some(__out) } else { ::core::option::Option::None }
+                quote! { ::core::option::Option::Some(::std::vec::Vec::new()) }
+            };
+            let present_ok = if optional {
+                quote! { ::core::option::Option::Some(::core::option::Option::Some(__out)) }
+            } else {
+                quote! { ::core::option::Option::Some(__out) }
+            };
+            quote! {
+                {
+                    #collect
+                    if !__ok {
+                        ::core::option::Option::None
+                    } else if __found {
+                        #present_ok
+                    } else {
+                        #absent
                     }
                 }
             }

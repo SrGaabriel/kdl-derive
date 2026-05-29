@@ -1,10 +1,10 @@
 [package]
-description = "Derive macros for KDL"
+description = "Derive macros for KDL supporting error accumulation"
 edition = "2024"
 license = "Apache-2.0"
 name = "kdl-derive"
 repository = "https://github.com/SrGaabriel/kdl-derive"
-version = "0.1.2"
+version = "0.2.0"
 
 [lib]
 proc-macro = true
@@ -15,4 +15,4 @@ quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 
 [dev-dependencies]
-kdl = "6.5.0"
+kdl = "6.6"

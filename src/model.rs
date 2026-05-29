@@ -1,5 +1,6 @@
 use syn::{
-    Data, DataStruct, DeriveInput, Fields, GenericArgument, Ident, LitStr, PathArguments, Type,
+    Data, DataStruct, DeriveInput, Expr, Fields, GenericArgument, Ident, LitStr, PathArguments,
+    Token, Type,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -10,12 +11,19 @@ pub enum FieldKind {
     ChildVec,
 }
 
+pub enum DefaultSource {
+    None,
+    Trait,
+    Path(Expr),
+}
+
 pub struct Field {
     pub ident: Ident,
     pub name: String,
     pub inner_ty: Type,
     pub optional: bool,
     pub kind: FieldKind,
+    pub default: DefaultSource,
 }
 
 pub struct Container {
@@ -67,6 +75,7 @@ impl Field {
 
         let mut name_override: Option<String> = None;
         let mut is_child = false;
+        let mut default = DefaultSource::None;
 
         for attr in &field.attrs {
             if !attr.path().is_ident("kdl") {
@@ -81,8 +90,20 @@ impl Field {
                     let lit: LitStr = value.parse()?;
                     name_override = Some(lit.value());
                     Ok(())
+                } else if meta.path.is_ident("default") {
+                    if meta.input.peek(Token![=]) {
+                        let value = meta.value()?;
+                        let lit: LitStr = value.parse()?;
+                        default = DefaultSource::Path(lit.parse()?);
+                    } else {
+                        default = DefaultSource::Trait;
+                    }
+                    Ok(())
                 } else {
-                    Err(meta.error("unknown `kdl` attribute, expected `child` or `name = \"..\"`"))
+                    Err(meta.error(
+                        "unknown `kdl` attribute, expected `child`, `name = \"..\"`, \
+                         `default` or `default = \"..\"`",
+                    ))
                 }
             })?;
         }
@@ -111,6 +132,7 @@ impl Field {
             inner_ty,
             optional,
             kind,
+            default,
         })
     }
 }
