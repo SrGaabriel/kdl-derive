@@ -10,7 +10,7 @@ pub fn expand_to_kdl(container: &Container) -> TokenStream {
     let pushes = container.fields.iter().map(field_to_tokens);
 
     quote! {
-        #[allow(non_snake_case, dead_code, unused_macros)]
+        #[allow(non_snake_case, dead_code, unused_macros, cast_possible_wrap)]
         const _: () = {
             trait __ToKdlValue {
                 fn __to_kdl_value(&self) -> ::kdl::KdlValue;
